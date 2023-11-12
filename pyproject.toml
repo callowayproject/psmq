@@ -1,0 +1,218 @@
+[build-system]
+
+requires = ["setuptools", ]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "psmq"
+description = "Python Simple Message Queue"
+authors = [
+    {name = "Corey Oordt", email = "coreyoordt@gmail.com" }
+]
+classifiers =[
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.9"
+readme = "README.md"
+keywords = ["psmq", ]
+dynamic = ["version"]
+dependencies = [
+    "redislite",
+]
+
+#[project.scripts]
+#psmq = "psmq.cli:cli"
+
+[project.urls]
+homepage = "https://github.com/callowayproject/psmq"
+repository = "https://github.com/callowayproject/psmq"
+documentation = "https://callowayproject.github.io/psmq"
+
+[project.optional-dependencies]
+dev = [
+    "bump-my-version",
+    "git-fame",
+    "generate-changelog",
+]
+test = [
+    "coverage>=6.1.2",
+    "pre-commit>=2.15.0",
+    "pytest-cov>=3.0.0",
+    "pytest>=6.0.0",
+    "u-msgpack-python",
+]
+docs =[
+    "black>=23.3.0",
+    "mkdocs>=1.4.3",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-literate-nav>=0.6.0",
+    "mkdocs-material>=9.1.0",
+    "mkdocs-markdownextradata-plugin>=0.2.5",
+    "mkdocs-section-index>=0.3.5",
+    "mkdocstrings>=0.21.2",
+    "mkdocstrings-python>=1.0.0",
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "psmq.__version__" }
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+
+[tool.setuptools.packages.find]
+exclude = ["example*", "tests*", "docs*", "build"]
+
+[tool.bumpversion]
+current_version = "0.1.0"
+commit = true
+commit_args = "--no-verify"
+tag = true
+tag_name = "{new_version}"
+allow_dirty = true
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)(\\.(?P<dev>dev)\\d+\\+[-_a-zA-Z0-9]+)?"
+serialize = [
+    "{major}.{minor}.{patch}.{dev}{distance_to_latest_tag}+{short_branch_name}",
+    "{major}.{minor}.{patch}"
+]
+message = "Version updated from {current_version} to {new_version}"
+
+[tool.bumpversion.parts.dev]
+values = ["release", "dev"]
+
+[[tool.bumpversion.files]]
+filename = "psmq/__init__.py"
+
+[[tool.bumpversion.files]]
+filename = "CHANGELOG.md"
+search = "Unreleased"
+
+[[tool.bumpversion.files]]
+filename = "CHANGELOG.md"
+search = "{current_version}...HEAD"
+replace = "{current_version}...{new_version}"
+
+
+[tool.coverage.run]
+branch = true
+omit = ["**/test_*.py"]
+
+
+[tool.coverage.report]
+omit = [
+    "*site-packages*",
+    "*tests*",
+    "*.tox*",
+]
+show_missing = true
+exclude_lines = [
+    "raise NotImplementedError",
+    "pragma: no-coverage",
+]
+
+[tool.pytest.ini_options]
+norecursedirs = [
+    ".*",
+    "build",
+    "dist",
+    "{arch}",
+    "*.egg",
+    "venv",
+    "requirements*",
+    "lib",
+]
+python_files = "test*.py"
+
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = false
+ignore-magic = true
+ignore-semiprivate = false
+ignore-private = false
+ignore-property-decorators = false
+ignore-module = false
+ignore-nested-functions = true
+ignore-nested-classes = true
+ignore-setters = false
+fail-under = 95
+exclude = ["setup.py", "docs", "build"]
+ignore-regex = ["^get$", "^mock_.*", ".*BaseClass.*"]
+verbose = 0
+quiet = false
+whitelist-regex = []
+color = true
+
+[tool.black]
+line-length = 119
+
+[tool.ruff]
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
+# "UP" "TRY" "PLR"
+select = ["E", "W", "F", "I", "N",  "B", "BLE", "C", "D", "E", "F", "I", "N", "S", "T", "W", "RUF", "NPY",  "PD", "PGH", "ANN", "C90", "PLC", "PLE", "PLW", "TCH"]
+ignore = [
+    "ANN002", "ANN003", "ANN101", "ANN102", "ANN204", "ANN401",
+    "S101", "S104",
+    "D106", "D107", "D200", "D212",
+]
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["E", "W", "F", "I", "N",  "B", "BLE", "C", "D", "E", "F", "I", "N", "S", "T", "W", "RUF", "NPY",  "PD", "PGH", "ANN", "C90", "PL", "PLC", "PLE", "PLW", "TCH"]
+unfixable = []
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+# Same as Black.
+line-length = 119
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+typing-modules = ["typing", "types", "typing_extensions", "mypy", "mypy_extensions"]
+
+[tool.ruff.per-file-ignores]
+"tests/*"=["S101", "PLR0913", "PLR0915", "PGH003", "ANN001", "ANN202", "ANN201", "PLR0912", "TRY301", "PLW0603", "PLR2004", "ANN101", "S106", "TRY201", "ANN003", "ANN002", "S105", "TRY003", "D103", "D104"]
+
+[tool.ruff.mccabe]
+# Unlike Flake8, default to a complexity level of 10.
+max-complexity = 10
+
+[tool.ruff.isort]
+order-by-type = true
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.pydoclint]
+style = "google"
+exclude = '\.git|tests'
+require-return-section-when-returning-none = false
+arg-type-hints-in-docstring = false
+check-return-types = false
+quiet = true

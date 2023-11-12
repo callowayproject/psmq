@@ -1,0 +1,128 @@
+checkout: null
+commit: ea986dafce834eade60512e88fa1d1280b1d7ece
+context:
+  _copy_without_render:
+  - .github/**/*.yaml
+  _docs_requirements:
+    black: '>=23.3.0'
+    mkdocs: '>=1.4.3'
+    mkdocs-gen-files: '>=0.5.0'
+    mkdocs-literate-nav: '>=0.6.0'
+    mkdocs-markdownextradata-plugin: '>=0.2.5'
+    mkdocs-material: '>=9.1.0'
+    mkdocs-section-index: '>=0.3.5'
+    mkdocs-techdocs-core: '>=1.2.0'
+    mkdocstrings: '>=0.21.2'
+    mkdocstrings-python: '>=1.0.0'
+  friendly_name: Python Simple Message Queue
+  github_user: callowayproject
+  packaging_tool: pip/setuptools
+  project_name: psmq
+  project_short_description: Python Simple Message Queue
+  project_slug: psmq
+  site_name: Python Simple Message Queue
+  version: 0.1.0
+directory: cookiecutter-package
+merge_strategies:
+  '*.json': comprehensive
+  '*.toml': comprehensive
+  '*.yaml': comprehensive
+  '*.yml': comprehensive
+no_input: false
+overwrite: []
+overwrite_exclude: []
+password: null
+skip_generation: []
+skip_hooks: false
+skip_if_file_exists: false
+template: datascience-cookiecomposer-templates/
+---
+checkout: null
+commit: ea986dafce834eade60512e88fa1d1280b1d7ece
+context:
+  _copy_without_render:
+  - .github/**/*.jinja
+  _dev_requirements:
+    bump2version: '>=1.0.1'
+    generate-changelog: '>=0.7.6'
+    git-fame: '>=1.12.2'
+    pip-tools: ''
+    poetry: ''
+  _docs_requirements: {}
+  _prod_requirements:
+    environs: '>=9.3.5'
+  _test_requirements:
+    coverage: '>=6.1.2'
+    poetry: '>=1.5.1'
+    pre-commit: '>=2.15.0'
+    pytest: '>=6.0.0'
+    pytest-cov: '>=3.0.0'
+  author: Corey Oordt
+  email: coreyoordt@gmail.com
+  friendly_name: Python Simple Message Queue
+  github_user: callowayproject
+  packaging_tool: pip/setuptools
+  project_name: psmq
+  project_short_description: Python Simple Message Queue
+  project_slug: psmq
+  site_name: Python Simple Message Queue
+  version: 0.1.0
+directory: cookiecutter-mkdocs
+merge_strategies:
+  '*.json': comprehensive
+  '*.toml': comprehensive
+  '*.yaml': do-not-merge
+  '*.yml': do-not-merge
+no_input: false
+overwrite: []
+overwrite_exclude: []
+password: null
+skip_generation: []
+skip_hooks: false
+skip_if_file_exists: false
+template: datascience-cookiecomposer-templates/
+---
+checkout: null
+commit: ea986dafce834eade60512e88fa1d1280b1d7ece
+context:
+  _copy_without_render:
+  - .github/**/*.jinja
+  _dev_requirements:
+    bump2version: '>=1.0.1'
+    generate-changelog: '>=0.7.6'
+    git-fame: '>=1.12.2'
+    pip-tools: ''
+    poetry: ''
+  _docs_requirements: {}
+  _prod_requirements:
+    environs: '>=9.3.5'
+  _test_requirements:
+    coverage: '>=6.1.2'
+    poetry: '>=1.5.1'
+    pre-commit: '>=2.15.0'
+    pytest: '>=6.0.0'
+    pytest-cov: '>=3.0.0'
+  author: Corey Oordt
+  email: coreyoordt@gmail.com
+  friendly_name: Python Simple Message Queue
+  github_user: callowayproject
+  packaging_tool: pip/setuptools
+  project_name: psmq
+  project_short_description: Python Simple Message Queue
+  project_slug: psmq
+  site_name: Python Simple Message Queue
+  version: 0.1.0
+directory: cookiecutter-boilerplate
+merge_strategies:
+  '*.json': comprehensive
+  '*.toml': comprehensive
+  '*.yaml': comprehensive
+  '*.yml': comprehensive
+no_input: false
+overwrite: []
+overwrite_exclude: []
+password: null
+skip_generation: []
+skip_hooks: false
+skip_if_file_exists: false
+template: datascience-cookiecomposer-templates/
