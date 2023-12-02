@@ -116,12 +116,12 @@ local function create_queue(keys)
     local queues_set_key = "QUEUES"
     local queue_name = keys[1]
     local queue_info_key = queue_name .. ":Q"
-    local viz_timeout = keys[2] or queue_defaults.viz_timeout
-    local initial_delay = keys[3] or queue_defaults.initial_delay
-    local max_size = keys[4] or queue_defaults.max_size
-    assert(type(viz_timeout) ~= "nil", "Visibility timeout is nil")
-    assert(type(initial_delay) ~= "nil", "initial delay is nil")
-    assert(type(max_size) ~= "nil", "max size is nil")
+    local viz_timeout = tonumber(keys[2]) or queue_defaults.viz_timeout
+    local initial_delay = tonumber(keys[3]) or queue_defaults.initial_delay
+    local max_size = tonumber(keys[4]) or queue_defaults.max_size
+    assert(type(viz_timeout) == "number", "Visibility timeout is not a number, it is " .. type(viz_timeout) .. " of value " .. viz_timeout)
+    assert(type(initial_delay) == "number", "initial delay is not a number, it is " .. type(initial_delay) .. " of value " .. initial_delay)
+    assert(type(max_size) == "number", "max size is not a number, it is " .. type(max_size) .. " of value " .. max_size)
 
     -- Create the queue.
     local already_existed = redis.call("SADD", queues_set_key, queue_name)
@@ -166,15 +166,15 @@ local function get_queue_info(keys)
     local raw_info = redis.call("HMGET", queue_info_key, unpack(queue_info_keys))
     local queue_info = {}
     for i, v in ipairs(raw_info) do
-        queue_info[queue_info_keys[i]] = v
+        queue_info[queue_info_keys[i]] = tonumber(v)
     end
 
     local num_msgs = redis.call("ZCARD", queue_name)
     local time_info = get_time()
     local num_hidden = redis.call("ZCOUNT", queue_name, time_info.millisec, "+inf")
 
-    queue_info.num_msgs = num_msgs
-    queue_info.num_hidden = num_hidden
+    queue_info.msgs = num_msgs
+    queue_info.hiddenmsgs = num_hidden
 
     return queue_info
 end
@@ -270,7 +270,9 @@ local function get_message(keys)
     local queue_key = keys[1]
     local time = get_time()
     local queue_info = get_queue_info({ queue_key })
-    local viz_timeout = (keys[2] or queue_info.vt) * 1000
+    local vt = tonumber(keys[2]) or queue_info.vt
+    assert(type(vt) == "number", "Visibility timeout is not a number: " .. type(vt) .. " " .. vt)
+    local viz_timeout = vt * 1000
     local queue_info_key = queue_key .. ":Q"
     local msg = redis.call("ZRANGE", queue_key, "-inf", time.millisec, "BYSCORE", "LIMIT", "0", "1")
 
@@ -339,9 +341,12 @@ redis.register_function("delete_message", delete_message)
 -- Pop a message from the queue.
 local function pop_message(keys)
     local queue_key = keys[1]
-    local time = get_time()
+    local next = next -- https://stackoverflow.com/questions/1252539/most-efficient-way-to-determine-if-a-lua-table-is-empty-contains-no-entries
 
-    local message = get_message({ queue_key, time.millisec, 0 })
+    local message = get_message({ queue_key })
+    if next(message) == nil then
+        return {}
+    end
 
     local message_id = message.msg_id
     delete_message({ queue_key, message_id })

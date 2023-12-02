@@ -1,16 +1,10 @@
-"""Test the queue functions in lua."""
-from pathlib import Path
+"""Test the low-level queue functions in lua."""
 import datetime
 import pytest
 import redis
 
 from psmq.connection import RedisLiteConnection, list_to_dict
-
-
-@pytest.fixture
-def conn(tmp_path: Path):
-    """Get a RedisLite connection."""
-    return RedisLiteConnection(tmp_path)
+from tests.conftest import conn
 
 
 def test_b36_encode(conn: RedisLiteConnection):
@@ -69,10 +63,8 @@ def test_get_queue_info(conn: RedisLiteConnection):
     assert int(r["modified"]) >= ts  # modified
     assert int(r["totalrecv"]) == 0  # totalrecv
     assert int(r["totalsent"]) == 0  # totalsent
-    assert int(r["num_msgs"]) == 0  # nummsgs
-    assert int(r["num_hidden"]) == 0  # hiddenmsgs
-    # assert int(r[7]) >= ts  # ts
-    # assert int(r[8]) >= ts * 1_000  # ts_msec
+    assert int(r["msgs"]) == 0  # nummsgs
+    assert int(r["hiddenmsgs"]) == 0  # hiddenmsgs
     assert conn._connection.sismember("QUEUES", "test_queue")
 
     r = conn._connection.fcall("create_queue", 4, "test_queue2", 10, 10, 10)
@@ -136,6 +128,22 @@ def test_push_message(conn: RedisLiteConnection):
     assert int(messages[0][1]) >= ts_msec
 
 
+def test_push_message_overrides_delay(conn: RedisLiteConnection):
+    """You can send a message to an existing queue and override its delay."""
+    r = conn._connection.fcall("create_queue", 3, "test_queue", "", 10)
+    assert r == 1
+    msg_id1 = conn._connection.fcall("push_message", 2, "test_queue", "should be delayed").decode("utf8")
+    msg_id2 = conn._connection.fcall("push_message", 3, "test_queue", "should not be delayed", 0).decode("utf8")
+
+    messages = conn._connection.zrange("test_queue", 0, -1, withscores=True)
+    assert len(messages) == 2
+    msg2 = messages[0]
+    msg1 = messages[1]
+    assert msg1[0].decode("utf8") == msg_id1
+    assert msg2[0].decode("utf8") == msg_id2
+    assert int(msg1[1]) > int(msg2[1])
+
+
 def test_push_message_missing_queue(conn: RedisLiteConnection):
     """You can send a message to a non-existing queue."""
     ts_msec = int((datetime.datetime.now().timestamp()) * 1_000)
@@ -177,6 +185,15 @@ def test_get_message(conn: RedisLiteConnection):
     queue_stats = conn._connection.hgetall("test_queue:Q")
     assert queue_stats[b"totalrecv"] == b"1"
     assert queue_stats[b"totalsent"] == b"1"
+
+
+def test_get_message_no_message_on_queue(conn: RedisLiteConnection):
+    """You can get a blank message from an existing queue when there is not message on the queue."""
+    r = conn._connection.fcall("create_queue", 3, "test_queue", "", 10)
+
+    # Get and verify the message
+    msg = list_to_dict(conn._connection.fcall("get_message", 1, "test_queue"))
+    assert msg == {}
 
 
 def test_get_message_uses_default_vt(conn: RedisLiteConnection):
@@ -272,3 +289,12 @@ def test_pop_message(conn: RedisLiteConnection):
     queue_stats = conn._connection.hgetall("test_queue:Q")
     assert queue_stats[b"totalrecv"] == b"1"
     assert queue_stats[b"totalsent"] == b"1"
+
+
+def test_pop_message_empty_queue(conn: RedisLiteConnection):
+    """Popping a message on an empty queue should return an empty list."""
+    conn._connection.fcall("create_queue", 1, "test_queue")
+
+    # Get and verify the message
+    msg = list_to_dict(conn._connection.fcall("pop_message", 1, "test_queue"))
+    assert msg == {}
