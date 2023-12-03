@@ -134,6 +134,7 @@ def test_get_message(conn: RedisLiteConnection):
     assert msg.retrieval_count == 1
     assert msg.sent < datetime.datetime.now()
     assert msg.first_retrieved < datetime.datetime.now()
+    assert "sent" in msg.metadata
 
     # Get the sorted messages after the get_message call
     post_messages = conn._connection.zrange("test_queue", 0, -1, withscores=True)

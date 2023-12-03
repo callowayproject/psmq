@@ -258,7 +258,8 @@ local function push_message(keys)
     local queue_key = keys[1]
     local message = keys[2]
     local delay = keys[3]
-    local metadata = keys[4] or {}
+    local serialized_metadata = keys[4] or "\128" -- 0x80 or 128 is the msgpack serialization of an empty hash
+    local metadata = deserialize_metadata({ serialized_metadata })
 
     -- Create the queue in case it doesn't exist.
     create_queue({ queue_key })
@@ -269,6 +270,7 @@ local function push_message(keys)
     local message_id = make_message_id({ time.microsec })
     local message_score = time.millisec + ((delay or queue_info.delay) * 1000)
     local message_metadata_key = message_id .. ":metadata"
+    metadata["sent"] = time.millisec / 1000
 
     -- Add the message to the queue.
     redis.call("ZADD", queue_key, message_score, message_id)
@@ -316,7 +318,7 @@ local function get_message(keys)
     local msg_info = redis.call("HMGET", queue_info_key, message_id, message_metadata_key)
     local rc = redis.call("HINCRBY", queue_info_key, message_rc_key, 1)
 
-    local output = { msg_id = message_id, msg_body = msg_info[1], rc = rc, metadata = deserialize_metadata({ msg_info[2] }) }
+    local output = { msg_id = message_id, msg_body = msg_info[1], rc = rc, metadata = msg_info[2] }
 
     -- if this is the first time receiving the message, record the timestamp as the first received
     if rc == 1 then

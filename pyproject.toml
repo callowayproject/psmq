@@ -23,6 +23,7 @@ keywords = ["psmq", ]
 dynamic = ["version"]
 dependencies = [
     "redislite",
+    "u-msgpack-python",
 ]
 
 #[project.scripts]

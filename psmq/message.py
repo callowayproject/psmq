@@ -1,5 +1,5 @@
 """Messages for PSMQ."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
@@ -28,6 +28,8 @@ class ReceivedMessage:
 
     ttl: Optional[int] = None
     "The message's time-to-live in seconds."
+
+    metadata: dict = field(default_factory=dict)
 
     # def delete(self) -> None:
     #     """

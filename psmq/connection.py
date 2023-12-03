@@ -1,48 +1,33 @@
 """Connection managers for queues."""
-from datetime import datetime
 import sqlite3
+from datetime import datetime
+from itertools import islice
 from pathlib import Path
 from sqlite3 import Connection
-from typing import Optional
+from typing import Any, Iterable, Optional, Tuple
 
+import umsgpack
 from redislite import Redis
 
 from psmq.exceptions import QueueDoesNotExist
-
-from itertools import islice
-
 from psmq.message import ReceivedMessage
 
 
-def list_to_dict(l: list) -> dict:
+def list_to_dict(kv_list: list) -> dict:
     """Convert a list of alternating key-value pairs into a dict."""
 
-    def batched(iterable, n) -> tuple:
+    def batched(iterable: Iterable) -> Iterable[Tuple[Any, Any]]:
         it = iter(iterable)
-        while batch := tuple(islice(it, n)):
-            yield batch
+        while batch := tuple(islice(it, 2)):
+            yield batch  # type: ignore[misc]
 
     r_str = []
-    for item in l:
-        r_str.append(item.decode("utf8") if isinstance(item, bytes) else item)
-    return dict(batched(r_str, 2))
-
-
-def setup_queue_db():
-    """
-    Idempotently setup the database for a queue.
-
-    create 3 tables: queue, messages, and config
-
-    Args:
-        name: The name of the queue
-        location: The path to the enclosing directory for the queue db file
-        visibility_timeout: The visibility timeout
-        delay: The delay
-        max_size: The maximum size of a message
-        retries: The number of retries
-    """
-    pass
+    for item in kv_list:
+        try:
+            r_str.append(item.decode("utf8") if isinstance(item, bytes) else item)
+        except UnicodeDecodeError:
+            r_str.append(item)
+    return dict(batched(r_str))
 
 
 def get_db_connection(name: str, location: Optional[Path] = None, raise_if_missing: bool = False) -> Connection:
@@ -68,7 +53,7 @@ def get_db_connection(name: str, location: Optional[Path] = None, raise_if_missi
         if not queue_file.exists():
             raise QueueDoesNotExist(name)
     db_name = location / f"{name}.db" if location else ":memory:"
-    return sqlite3.connect(db_name)
+    return sqlite3.connect(str(db_name))
 
 
 class RedisLiteConnection:
@@ -138,15 +123,18 @@ class RedisLiteConnection:
         else:
             msg_dict = list_to_dict(self._connection.fcall("get_message", 1, queue_name))
         if msg_dict:
+            metadata = umsgpack.unpackb(msg_dict["metadata"])
+            metadata["sent"] = datetime.fromtimestamp(int(metadata["sent"]))
             return ReceivedMessage(
                 queue_name=queue_name,
                 message_id=msg_dict["msg_id"],
                 data=msg_dict["msg_body"],
-                # sent=datetime.fromtimestamp(int(msg_dict["sent"]) / 1000),
-                sent=datetime.now(),
+                metadata=metadata,
+                sent=metadata["sent"],
                 first_retrieved=datetime.fromtimestamp(int(msg_dict["fr"]) / 1000),
                 retrieval_count=msg_dict["rc"],
             )
+        return None
 
     def delete_message(self, queue_name: str, msg_id: str) -> None:
         """Delete a message from a queue."""

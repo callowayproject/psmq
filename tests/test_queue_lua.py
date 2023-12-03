@@ -2,6 +2,7 @@
 import datetime
 import pytest
 import redis
+import umsgpack
 
 from psmq.connection import RedisLiteConnection, list_to_dict
 from tests.conftest import conn
@@ -121,7 +122,9 @@ def test_push_message(conn: RedisLiteConnection):
     assert r == 1
     msg_id = conn._connection.fcall("push_message", 3, "test_queue", "foo", 0).decode("utf8")
     msg = conn._connection.hget("test_queue:Q", msg_id).decode("utf8")
+    metadata = conn._connection.hget("test_queue:Q", f"{msg_id}:metadata")
     assert msg == "foo"
+    assert metadata.startswith(b"\x81\xa4sent")
     messages = conn._connection.zrange("test_queue", 0, -1, withscores=True)
     assert len(messages) == 1
     assert messages[0][0].decode("utf8") == msg_id
@@ -170,6 +173,7 @@ def test_get_message(conn: RedisLiteConnection):
     msg = list_to_dict(conn._connection.fcall("get_message", 2, "test_queue", viz_timeout))
     assert msg["msg_id"] == msg_id
     assert msg["msg_body"] == "foo"
+    assert umsgpack.unpackb(msg["metadata"]) == {"sent": int(pre_messages[0][1]) / 1000}
     assert msg["rc"] == 1
 
     # Get the sorted messages after the get_message call
