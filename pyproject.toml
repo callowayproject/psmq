@@ -212,7 +212,7 @@ convention = "google"
 [tool.pydoclint]
 style = "google"
 exclude = '\.git|tests'
-require-return-section-when-returning-none = false
+require-return-section-when-returning-nothing = false
 arg-type-hints-in-docstring = false
 check-return-types = false
 quiet = true

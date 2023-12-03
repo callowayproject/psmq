@@ -1,4 +1,5 @@
 """Connection managers for queues."""
+from datetime import datetime
 import sqlite3
 from pathlib import Path
 from sqlite3 import Connection
@@ -9,6 +10,8 @@ from redislite import Redis
 from psmq.exceptions import QueueDoesNotExist
 
 from itertools import islice
+
+from psmq.message import ReceivedMessage
 
 
 def list_to_dict(l: list) -> dict:
@@ -102,18 +105,10 @@ class RedisLiteConnection:
         """Get the config for a queue."""
         from .queue import QueueConfiguration, QueueMetadata
 
-        results = self._connection.fcall("get_queue_info", 1, queue_name)
-        config = QueueConfiguration(int(results[0]), int(results[1]), int(results[2]))
-        metadata = QueueMetadata(
-            **{
-                "created": int(results[3]),
-                "modified": int(results[4]),
-                "totalrecv": int(results[5]),
-                "totalsent": int(results[6]),
-                "msgs": int(results[7]),
-                "hiddenmsgs": int(results[8]),
-            }
-        )
+        results = list_to_dict(self._connection.fcall("get_queue_info", 1, queue_name))
+        results = {key: int(value) for key, value in results.items()}
+        config = QueueConfiguration(results.pop("vt"), results.pop("delay"), results.pop("maxsize"))
+        metadata = QueueMetadata(**results)
         return {"config": config, "metadata": metadata}
 
     def set_queue_visibility_timeout(self, queue_name: str, vt: int) -> None:
@@ -128,10 +123,35 @@ class RedisLiteConnection:
         """Set the max size for a queue."""
         self._connection.fcall("set_queue_max_size", 2, queue_name, max_size)
 
-    def push_message(self, queue_name: str, message: bytes, delay: int = 0, ttl: int = 0) -> str:
+    def push_message(
+        self, queue_name: str, message: bytes, delay: Optional[int] = None, ttl: Optional[int] = None
+    ) -> str:
         """Send a message to a queue."""
-        return self._connection.fcall("push_message", 3, queue_name, message, delay).decode("utf8")
+        if delay is not None:
+            return self._connection.fcall("push_message", 3, queue_name, message, delay).decode("utf8")
+        return self._connection.fcall("push_message", 2, queue_name, message).decode("utf8")
 
-    def get_message(self, queue_name: str):
+    def get_message(self, queue_name: str, visibility_timeout: Optional[int] = None) -> Optional[ReceivedMessage]:
         """Get a message from a queue."""
-        result = self._connection.fcall("get_message", 1, queue_name)
+        if visibility_timeout is not None:
+            msg_dict = list_to_dict(self._connection.fcall("get_message", 2, queue_name, visibility_timeout))
+        else:
+            msg_dict = list_to_dict(self._connection.fcall("get_message", 1, queue_name))
+        if msg_dict:
+            return ReceivedMessage(
+                queue_name=queue_name,
+                message_id=msg_dict["msg_id"],
+                data=msg_dict["msg_body"],
+                # sent=datetime.fromtimestamp(int(msg_dict["sent"]) / 1000),
+                sent=datetime.now(),
+                first_retrieved=datetime.fromtimestamp(int(msg_dict["fr"]) / 1000),
+                retrieval_count=msg_dict["rc"],
+            )
+
+    def delete_message(self, queue_name: str, msg_id: str) -> None:
+        """Delete a message from a queue."""
+        self._connection.fcall("delete_message", 2, queue_name, msg_id)
+
+    def pop_message(self, queue_name: str) -> dict:
+        """Get and delete a message from a queue."""
+        return list_to_dict(self._connection.fcall("pop_message", 1, queue_name))
