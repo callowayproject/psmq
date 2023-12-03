@@ -11,6 +11,7 @@
 --   FIELDS
 --
 --   {msgid}: The message
+--   {msgid}:metadata: The metadata for a single message. It is a messagpack serialized hash map
 --   {msgid}:rc: The receive counter for a single message. Will be incremented on each receive.
 --   {msgid}:fr: The timestamp when this message was received for the first time. Will be created on the first receive.
 --   totalsent: The total number of messages sent to this queue.
@@ -105,6 +106,23 @@ local function make_message_id(keys)
 end
 
 redis.register_function("make_message_id", make_message_id)
+
+
+-- serialize a table of metadata to msgpack
+local function serialize_metadata(keys)
+    local metadata = keys[1]
+    return cmsgpack.pack(metadata)
+end
+
+redis.register_function("serialize_metadata", serialize_metadata)
+
+-- deserialize a table of metadata from msgpack
+local function deserialize_metadata(keys)
+    local metadata = keys[1]
+    return cmsgpack.unpack(metadata)
+end
+
+redis.register_function("deserialize_metadata", deserialize_metadata)
 
 --
 -- Queue functions
@@ -240,6 +258,7 @@ local function push_message(keys)
     local queue_key = keys[1]
     local message = keys[2]
     local delay = keys[3]
+    local metadata = keys[4] or {}
 
     -- Create the queue in case it doesn't exist.
     create_queue({ queue_key })
@@ -249,12 +268,13 @@ local function push_message(keys)
     local time = get_time()
     local message_id = make_message_id({ time.microsec })
     local message_score = time.millisec + ((delay or queue_info.delay) * 1000)
+    local message_metadata_key = message_id .. ":metadata"
 
     -- Add the message to the queue.
     redis.call("ZADD", queue_key, message_score, message_id)
 
     -- Add the message to the queue info hash.
-    redis.call("HSET", queue_info_key, message_id, message)
+    redis.call("HMSET", queue_info_key, message_id, message, message_metadata_key, serialize_metadata({ metadata }))
 
     -- Increase the total message count for the queue.
     redis.call("HINCRBY", queue_info_key, "totalsent", 1)
@@ -283,6 +303,7 @@ local function get_message(keys)
     local message_id = msg[1]
     local message_rc_key = message_id .. ":rc"  -- rc = receive count
     local message_fr_key = message_id .. ":fr"  -- fr = first received
+    local message_metadata_key = message_id .. ":metadata"
 
     -- Increase the score of the message by viz_timeout.
 
@@ -292,10 +313,10 @@ local function get_message(keys)
     redis.call("HINCRBY", queue_info_key, "totalrecv", 1)
 
     -- get the message and increment the receive count
-    local msg_body = redis.call("HGET", queue_info_key, message_id)
+    local msg_info = redis.call("HMGET", queue_info_key, message_id, message_metadata_key)
     local rc = redis.call("HINCRBY", queue_info_key, message_rc_key, 1)
 
-    local output = { msg_id = message_id, msg_body = msg_body, rc = rc }
+    local output = { msg_id = message_id, msg_body = msg_info[1], rc = rc, metadata = deserialize_metadata({ msg_info[2] }) }
 
     -- if this is the first time receiving the message, record the timestamp as the first received
     if rc == 1 then
@@ -329,10 +350,11 @@ local function delete_message(keys)
     local queue_info_key = queue_key .. ":Q"
     local message_rc_key = message_id .. ":rc"  -- rc = receive count
     local message_fr_key = message_id .. ":fr"  -- fr = first received
+    local message_metadata_key = message_id .. ":metadata"
 
     -- remove the message from the queue
     redis.call("ZREM", queue_key, message_id)
-    redis.call("HDEL", queue_info_key, message_id, message_rc_key, message_fr_key)
+    redis.call("HDEL", queue_info_key, message_id, message_rc_key, message_fr_key, message_metadata_key)
 end
 
 redis.register_function("delete_message", delete_message)

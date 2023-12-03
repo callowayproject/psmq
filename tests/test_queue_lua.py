@@ -244,6 +244,9 @@ def test_delete_message(conn: RedisLiteConnection):
     assert queue_stats[b"totalrecv"] == b"0"
     assert queue_stats[b"totalsent"] == b"1"
     assert msg_id.encode("utf8") not in queue_stats
+    assert f"{msg_id}:rc".encode("utf8") not in queue_stats
+    assert f"{msg_id}:fr".encode("utf8") not in queue_stats
+    assert f"{msg_id}:metadata".encode("utf8") not in queue_stats
 
 
 def test_delete_missing_message(conn: RedisLiteConnection):
