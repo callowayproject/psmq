@@ -257,18 +257,27 @@ redis.register_function("set_queue_max_size", set_queue_max_size)
 local function push_message(keys)
     local queue_key = keys[1]
     local message = keys[2]
-    local delay = keys[3]
+    local delay = tonumber(keys[3]) -- If delay is nil, the queue's initial delay will be used.
     local serialized_metadata = keys[4] or "\128" -- 0x80 or 128 is the msgpack serialization of an empty hash
     local metadata = deserialize_metadata({ serialized_metadata })
 
     -- Create the queue in case it doesn't exist.
     create_queue({ queue_key })
+
+    -- Get the queue delay.
     local queue_info = get_queue_info({ queue_key })
     assert(type(queue_info.delay) ~= "nil", "Queue delay is nil")
+
+    if delay == nil then
+        delay = queue_info.delay
+    elseif delay < 0 then
+        delay = queue_info.delay
+    end
+
     local queue_info_key = queue_key .. ":Q"
     local time = get_time()
     local message_id = make_message_id({ time.microsec })
-    local message_score = time.millisec + ((delay or queue_info.delay) * 1000)
+    local message_score = time.millisec + (delay * 1000)
     local message_metadata_key = message_id .. ":metadata"
     metadata["sent"] = time.millisec / 1000
 

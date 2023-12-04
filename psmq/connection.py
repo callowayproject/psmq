@@ -109,12 +109,23 @@ class RedisLiteConnection:
         self._connection.fcall("set_queue_max_size", 2, queue_name, max_size)
 
     def push_message(
-        self, queue_name: str, message: bytes, delay: Optional[int] = None, ttl: Optional[int] = None
+        self,
+        queue_name: str,
+        message: bytes,
+        delay: Optional[int] = None,
+        ttl: Optional[int] = None,
+        metadata: Optional[dict] = None,
     ) -> str:
         """Send a message to a queue."""
-        if delay is not None:
-            return self._connection.fcall("push_message", 3, queue_name, message, delay).decode("utf8")
-        return self._connection.fcall("push_message", 2, queue_name, message).decode("utf8")
+        if metadata is None:
+            metadata = umsgpack.packb({})
+        elif isinstance(metadata, dict):
+            metadata = umsgpack.packb(metadata)
+        else:
+            raise TypeError("metadata must be a dict")
+        if delay is None:
+            delay = -1
+        return self._connection.fcall("push_message", 4, queue_name, message, delay, metadata).decode("utf8")
 
     def get_message(self, queue_name: str, visibility_timeout: Optional[int] = None) -> Optional[ReceivedMessage]:
         """Get a message from a queue."""
