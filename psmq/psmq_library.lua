@@ -164,6 +164,26 @@ end
 
 redis.register_function("create_queue", create_queue)
 
+-- Delete a queue.
+-- Returns 1 if the queue was deleted, 0 if it didn't exist.
+local function delete_queue(keys)
+    local queue_name = keys[1]
+    local queue_info_key = queue_name .. ":Q"
+    local queues_set_key = "QUEUES"
+
+    -- Delete the queue.
+    local already_existed = redis.call("SREM", queues_set_key, queue_name)
+    if already_existed == 0 then
+        return 0
+    end
+
+    -- Delete the queue info hash.
+    redis.call("DEL", queue_info_key)
+    return 1
+end
+
+redis.register_function("delete_queue", delete_queue)
+
 -- Get queue info.
 local function get_queue_info(keys)
     local queue_name = keys[1]

@@ -36,19 +36,22 @@ def validate_queue_name(qname: str, raise_on_error: bool = False) -> bool:
     """
     if not qname:
         if raise_on_error:
+            raise InvalidQueueName("Queue name cannot be empty.")
+        else:
             return False
-        raise InvalidQueueName("Queue name cannot be empty.")
 
     if len(qname) > QNAME_MAX_LENGTH:
         if raise_on_error:
+            raise QueueNameTooLong(QNAME_MAX_LENGTH)
+        else:
             return False
-        raise QueueNameTooLong(QNAME_MAX_LENGTH)
 
     invalid_chars = QNAME_INVALID_CHARS_RE.search(qname)
     if invalid_chars:
         if raise_on_error:
+            raise InvalidCharacter(qname[invalid_chars.span()[0]])
+        else:
             return False
-        raise InvalidCharacter(qname[invalid_chars.span()[0]])
     return True
 
 
@@ -56,7 +59,7 @@ def validate_int(
     value,
     min_value: Optional[int] = None,
     max_value: Optional[int] = None,
-    quiet: bool = False,
+    raise_on_error: bool = False,
 ) -> bool:
     """
     Validate value is integer and between min and max values (if specified).
@@ -70,25 +73,28 @@ def validate_int(
         value: The value to validate
         min_value: If specified, the integer must be greater than or equal to this value
         max_value: If specified, the integer must be less than or equal to this value
-        quiet: If True, return a ``bool`` instead of raising exceptions on errors
+        raise_on_error: If False, return a ``bool`` instead of raising exceptions on errors
 
     Returns:
-        ``True`` if valid, ``False`` otherwise if ``quiet`` is ``True``
+        ``True`` if valid, ``False`` otherwise if ``raise_on_error`` is ``False``
     """
     if value is None or not isinstance(value, int):
-        if quiet:
+        if raise_on_error:
+            raise TypeError("An integer value is required.")
+        else:
             return False
-        raise TypeError("An integer value is required.")
 
     if min_value is not None and value < min_value:
-        if quiet:
+        if raise_on_error:
+            raise ValueTooLow(min_value)
+        else:
             return False
-        raise ValueTooLow(min_value)
 
     if max_value is not None and value > max_value:
-        if quiet:
+        if raise_on_error:
+            raise ValueTooHigh(max_value)
+        else:
             return False
-        raise ValueTooHigh(max_value)
 
     return True
 

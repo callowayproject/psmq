@@ -31,12 +31,6 @@ class ReceivedMessage:
 
     metadata: dict = field(default_factory=dict)
 
-    # def delete(self) -> None:
-    #     """
-    #     Delete this message from the queue.
-    #     """
-    #     self.queue.delete(self.message_id)
-
     @property
     def expires(self) -> Optional[datetime]:
         """

@@ -44,6 +44,7 @@ test = [
     "coverage>=6.1.2",
     "pre-commit>=2.15.0",
     "pytest-cov>=3.0.0",
+    "pytest-mock>=3.0.0",
     "pytest>=6.0.0",
     "u-msgpack-python",
 ]
@@ -128,6 +129,12 @@ norecursedirs = [
     "lib",
 ]
 python_files = "test*.py"
+addopts = [
+    "--cov=psmq",
+    "--cov-branch",
+    "--cov-report=term",
+    "--cov-report=html",
+]
 
 [tool.interrogate]
 ignore-init-method = true

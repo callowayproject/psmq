@@ -1,15 +1,17 @@
 """Queues and message handling."""
 from dataclasses import dataclass
-from typing import Optional, Any, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from .connection import RedisLiteConnection
-from .message import Message
+from .exceptions import NoMessageInQueue, UndeserializableMessage, UnserializableMessage
+from .message import ReceivedMessage
+from .validation import validate_queue_name
 
-if TYPE_CHECKING:
-    from .manager import SerializerFunc, DeserializerFunc
+if TYPE_CHECKING:  # pragma: no-coverage
+    from .manager import DeserializerFunc, SerializerFunc
 
 
-@dataclass
+@dataclass(frozen=True)
 class QueueConfiguration:
     """Configuration for a queue."""
 
@@ -30,7 +32,7 @@ class QueueConfiguration:
     "The optional time to live for a message in milliseconds."
 
 
-@dataclass
+@dataclass(frozen=True)
 class QueueMetadata:
     """Metadata for a queue."""
 
@@ -44,7 +46,7 @@ class QueueMetadata:
     "Timestamp (epoch in seconds) when the queue was created"
 
     modified: int
-    "Timestamp (epoch in seconds) when the queue was last modified with :meth:`.Queue.set_attributes`"
+    "Timestamp (epoch in seconds) when the queue was last modified"
 
     msgs: int
     "Current number of messages in the queue"
@@ -79,6 +81,7 @@ class Queue:
             serializer: Optional method to serialize messages
             deserializer: Optional method to deserialize messages
         """
+        validate_queue_name(name, raise_on_error=True)
         self.connection = connection
         self.name = name
         q_info = self.connection.get_queue_info(name)
@@ -86,6 +89,57 @@ class Queue:
         self._metadata = q_info["metadata"]
         self.serializer = serializer
         self.deserializer = deserializer
+
+    def metadata(self) -> QueueMetadata:
+        """
+        Get the metadata for the queue.
+
+        Returns:
+            The queue metadata
+        """
+        q_info = self.connection.get_queue_info(self.name)
+        return q_info["metadata"]
+
+    def serialize(self, message: Any) -> bytes:
+        """
+        Serialize a message.
+
+        Args:
+            message: The message to serialize
+
+        Returns:
+            The serialized message
+        """
+        if self.serializer:
+            try:
+                return self.serializer(message)
+            except Exception as e:
+                # TODO: This might be a place to provide a hook or configuration for error handling
+                raise UnserializableMessage(message, self.serializer.__name__) from e
+        else:
+            return message
+
+    def deserialize(self, message: bytes) -> Any:
+        """
+        Deserialize a message.
+
+        Args:
+            message: The message to deserialize
+
+        Raises:
+            UndeserializableMessage: If the message cannot be deserialized
+
+        Returns:
+            The deserialized message
+        """
+        if self.deserializer:
+            try:
+                return self.deserializer(message)
+            except Exception as e:
+                # TODO: This might be a place to provide a hook or configuration for error handling
+                raise UndeserializableMessage(message, self.deserializer.__name__) from e
+        else:
+            return message
 
     def push(self, message: Any, delay: Optional[int] = None, ttl: Optional[int] = None) -> str:
         """
@@ -101,7 +155,8 @@ class Queue:
         Returns:
             The message id
         """
-        pass
+        serialized = self.serialize(message)
+        return self.connection.push_message(self.name, serialized, delay=delay, ttl=ttl)
 
     def push_many(self, messages: List[Any], delay: Optional[int] = None, ttl: Optional[int] = None) -> list:
         """
@@ -117,7 +172,12 @@ class Queue:
         Returns:
             All message ids
         """
-        pass
+        message_ids = []
+        with self.connection.pipeline():
+            for message in messages:
+                serialized = self.serialize(message)
+                message_ids.append(self.connection.push_message(self.name, serialized, delay=delay, ttl=ttl))
+        return message_ids
 
     def delete(self, msg_id: str) -> None:
         """
@@ -126,9 +186,9 @@ class Queue:
         Args:
             msg_id: The ID of the message to delete
         """
-        pass
+        self.connection.delete_message(self.name, msg_id)
 
-    def get(self, visibility_timeout: Optional[int] = None, raise_on_empty: bool = False) -> Optional[Message]:
+    def get(self, visibility_timeout: Optional[int] = None, raise_on_empty: bool = False) -> Optional[ReceivedMessage]:
         """
         Receive a message.
 
@@ -144,9 +204,16 @@ class Queue:
         Returns:
             The message if available, or ``None``
         """
-        pass
+        msg = self.connection.get_message(self.name, visibility_timeout=visibility_timeout)
+        if msg is None and raise_on_empty:
+            raise NoMessageInQueue(self.name)
+        elif msg is None:
+            return None
+        else:
+            msg.data = self.deserialize(msg.data) if msg.data else msg.data
+            return msg
 
-    def pop(self, raise_on_empty: bool = False) -> Optional[Message]:
+    def pop(self, raise_on_empty: bool = False) -> Optional[ReceivedMessage]:
         """
         Receive a message and delete it immediately.
 
@@ -165,39 +232,39 @@ class Queue:
         return msg
 
 
-def handle_message_result(result: tuple) -> Message:
-    """
-    Handle a message received from the queue and format it properly.
+# def handle_message_result(result: tuple) -> Message:
+#     """
+#     Handle a message received from the queue and format it properly.
+#
+#     Args:
+#         result: The raw message data received from Redis
+#
+#     Returns:
+#         A populated Message object
+#     """
+#     message_id, message, rc, fr = result
+#     message = decode_message(message)
+#     sent = base36decode(message_id[:10])
+#     return Message(message_id, message, sent, fr, rc)
 
-    Args:
-        result: The raw message data received from Redis
 
-    Returns:
-        A populated Message object
-    """
-    message_id, message, rc, fr = result
-    message = decode_message(message)
-    sent = base36decode(message_id[:10])
-    return Message(message_id, message, sent, fr, rc)
-
-
-def make_message_id(usec: int) -> str:
-    """
-    Need to create a unique id based on the redis timestamp and a random number.
-
-    The first part is the Redis time base-36 encoded which lets redis order the messages correctly
-    even when they are in the same millisecond.
-
-    Args:
-        usec: The Redis timestamp in microseconds as an integer
-
-    Returns:
-        A time-sortable, unique message id
-    """
-    import random
-
-    charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-
-    msg_id = [random.choice(charset) for _ in range(22)]  # nosec
-    msg_id.insert(0, base36encode(usec))
-    return "".join(msg_id)
+# def make_message_id(usec: int) -> str:
+#     """
+#     Need to create a unique id based on the redis timestamp and a random number.
+#
+#     The first part is the Redis time base-36 encoded which lets redis order the messages correctly
+#     even when they are in the same millisecond.
+#
+#     Args:
+#         usec: The Redis timestamp in microseconds as an integer
+#
+#     Returns:
+#         A time-sortable, unique message id
+#     """
+#     import random
+#
+#     charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+#
+#     msg_id = [random.choice(charset) for _ in range(22)]  # nosec
+#     msg_id.insert(0, base36encode(usec))
+#     return "".join(msg_id)

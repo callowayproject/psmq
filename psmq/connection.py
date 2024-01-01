@@ -40,7 +40,7 @@ class RedisLiteConnection:
 
     def list_queues(self) -> set:
         """List all queues."""
-        return self._connection.smembers(self.queue_set_key)
+        return {name.decode("utf8") for name in self._connection.smembers(self.queue_set_key)}
 
     def create_queue(self, name: str, vt: int = 60, delay: int = 0, max_size: int = 65565) -> bool:
         """
@@ -57,6 +57,10 @@ class RedisLiteConnection:
         """
         result = self._connection.fcall("create_queue", 4, name, vt, delay, max_size)
         return bool(result)
+
+    def delete_queue(self, name: str) -> None:
+        """Delete a queue."""
+        self._connection.fcall("delete_queue", 1, name)
 
     def get_queue_info(self, queue_name: str) -> dict:
         """Get the config for a queue."""
@@ -126,3 +130,10 @@ class RedisLiteConnection:
     def pop_message(self, queue_name: str) -> dict:
         """Get and delete a message from a queue."""
         return list_to_dict(self._connection.fcall("pop_message", 1, queue_name))
+
+    @contextmanager
+    def pipeline(self) -> Iterable[Redis]:
+        """Create a transaction pipeline."""
+        tx = self._connection.pipeline(transaction=True)
+        yield
+        tx.execute()

@@ -1,4 +1,5 @@
 """Exceptions raised."""
+from typing import Any
 
 
 class PSMQError(Exception):
@@ -86,3 +87,21 @@ class ValueTooHigh(ValueError):
 
     def __init__(self, max_val):
         super().__init__(f"The value must not be higher than {max_val}.")
+
+
+class UnserializableMessage(PSMQError):
+    """
+    Raised when a message cannot be serialized.
+    """
+
+    def __init__(self, message: Any, serializer: str):
+        super().__init__(f"Cannot serialize message `{message!r}` with {serializer}")
+
+
+class UndeserializableMessage(PSMQError):
+    """
+    Raised when a message cannot be deserialized.
+    """
+
+    def __init__(self, message: bytes, deserializer: str):
+        super().__init__(f"Cannot deserialize message `{message!r}` with {deserializer}")

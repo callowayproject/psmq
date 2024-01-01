@@ -1,10 +1,10 @@
 """Queue mangement."""
 import logging
+from functools import cache
 from pathlib import Path
 from typing import Optional
 
 from .connection import RedisLiteConnection
-from .exceptions import QueueDoesNotExist
 from .queue import Queue, QueueConfiguration
 from .serialize import SerializerFunc, DeserializerFunc, default_serializer, default_deserializer
 
@@ -20,8 +20,9 @@ class QueueManager:
             db_dir: The path to the directory containing the queue db files
         """
         self.db_dir = db_dir
-        self.redis_queues = RedisLiteConnection(db_location=db_dir)
+        self.connection = RedisLiteConnection(db_location=db_dir)
 
+    @cache
     def get_queue(
         self,
         name: str,
@@ -44,9 +45,12 @@ class QueueManager:
         Returns:
             The queue
         """
-        self.redis_queues.create_queue(
-            name, default_config.visibility_timeout, default_config.initial_delay, default_config.max_size
-        )
+        if default_config:
+            self.connection.create_queue(
+                name, default_config.visibility_timeout, default_config.initial_delay, default_config.max_size
+            )
+        else:
+            self.connection.create_queue(name)
 
         if not serializer:
             serializer = default_serializer
@@ -54,8 +58,26 @@ class QueueManager:
             deserializer = default_deserializer
 
         return Queue(
-            connection=self.redis_queues,
+            connection=self.connection,
             name=name,
             serializer=serializer,
             deserializer=deserializer,
         )
+
+    def delete_queue(self, name: str) -> None:
+        """
+        Delete a queue and all its messages.
+
+        Args:
+            name: The name of the queue
+        """
+        self.connection.delete_queue(name)
+
+    def queues(self) -> set:
+        """
+        List all queues.
+
+        Returns:
+            The set of queue names
+        """
+        return self.connection.list_queues()
