@@ -1,15 +1,13 @@
 """Connection managers for queues."""
-import sqlite3
+from contextlib import contextmanager
 from datetime import datetime
 from itertools import islice
 from pathlib import Path
-from sqlite3 import Connection
 from typing import Any, Iterable, Optional, Tuple
 
 import umsgpack
 from redislite import Redis
 
-from psmq.exceptions import QueueDoesNotExist
 from psmq.message import ReceivedMessage
 
 
@@ -28,32 +26,6 @@ def list_to_dict(kv_list: list) -> dict:
         except UnicodeDecodeError:
             r_str.append(item)
     return dict(batched(r_str))
-
-
-def get_db_connection(name: str, location: Optional[Path] = None, raise_if_missing: bool = False) -> Connection:
-    """
-    Create a connection to a persistent or ephemeral database.
-
-    Args:
-        name: The name of the queue
-        location: The path to the enclosing directory for the queue db file. ``None`` if ephemeral db.
-        raise_if_missing: If ``True``, do not attempt to create the db and raise an error
-
-    Raises:
-        QueueDoesNotExist: If ``raise_if_missing`` is ``True`` and the DB is missing.
-
-    Returns:
-        The sqlite connection
-    """
-    if location is None and raise_if_missing:
-        # Ephemeral DBs are always missing
-        raise QueueDoesNotExist(name)
-    elif location and raise_if_missing:
-        queue_file = location / f"{name}.db"
-        if not queue_file.exists():
-            raise QueueDoesNotExist(name)
-    db_name = location / f"{name}.db" if location else ":memory:"
-    return sqlite3.connect(str(db_name))
 
 
 class RedisLiteConnection:
