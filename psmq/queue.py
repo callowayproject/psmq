@@ -1,14 +1,15 @@
 """Queues and message handling."""
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, List, Optional
 
-from .connection import RedisLiteConnection
-from .exceptions import NoMessageInQueue, UndeserializableMessage, UnserializableMessage
-from .message import ReceivedMessage
-from .validation import validate_queue_name
+from redis import Redis
 
-if TYPE_CHECKING:  # pragma: no-coverage
-    from .manager import DeserializerFunc, SerializerFunc
+from psmq import queue_ops
+from psmq.exceptions import NoMessageInQueue, UndeserializableMessage, UnserializableMessage
+from psmq.serialize import DeserializerFunc, SerializerFunc, default_serializer, default_deserializer
+from psmq.message import ReceivedMessage
+from psmq.validation import validate_queue_name
 
 
 @dataclass(frozen=True)
@@ -63,32 +64,41 @@ class QueueMetadata:
 class Queue:
     """
     Representation of a specific Queue in Redis.
+
+    Args:
+        connection: The root connection object
+        name: The name of the queue
+        default_config: The default configuration to use if the queue does not exist
+        serializer: Optional method to serialize messages
+        deserializer: Optional method to deserialize messages
     """
 
     def __init__(
         self,
-        connection: RedisLiteConnection,
+        connection: Redis,
         name: str,
+        default_config: Optional[QueueConfiguration] = None,
         serializer: Optional["SerializerFunc"] = None,
         deserializer: Optional["DeserializerFunc"] = None,
     ):
-        """
-        Construct a connection to a Queue in Redis.
-
-        Args:
-            connection: The root connection object
-            name: The name of the queue
-            serializer: Optional method to serialize messages
-            deserializer: Optional method to deserialize messages
-        """
         validate_queue_name(name, raise_on_error=True)
         self.connection = connection
         self.name = name
-        q_info = self.connection.get_queue_info(name)
+        if default_config:
+            queue_ops.create_queue(
+                connection,
+                name,
+                default_config.visibility_timeout,
+                default_config.initial_delay,
+                default_config.max_size,
+            )
+        else:
+            queue_ops.create_queue(connection, name)
+        q_info = queue_ops.get_queue_info(self.connection, name)
         self._configuration = q_info["config"]
         self._metadata = q_info["metadata"]
-        self.serializer = serializer
-        self.deserializer = deserializer
+        self.serializer = serializer or default_serializer
+        self.deserializer = deserializer or default_deserializer
 
     def metadata(self) -> QueueMetadata:
         """
@@ -97,7 +107,7 @@ class Queue:
         Returns:
             The queue metadata
         """
-        q_info = self.connection.get_queue_info(self.name)
+        q_info = queue_ops.get_queue_info(self.connection, self.name)
         return q_info["metadata"]
 
     def serialize(self, message: Any) -> bytes:
@@ -107,17 +117,17 @@ class Queue:
         Args:
             message: The message to serialize
 
+        Raises:
+            UnserializableMessage: If the message cannot be deserialized
+
         Returns:
             The serialized message
         """
-        if self.serializer:
-            try:
-                return self.serializer(message)
-            except Exception as e:
-                # TODO: This might be a place to provide a hook or configuration for error handling
-                raise UnserializableMessage(message, self.serializer.__name__) from e
-        else:
-            return message
+        try:
+            return self.serializer(message)
+        except Exception as e:  # NOQA: BLE001
+            # TODO: This might be a place to provide a hook or configuration for error handling
+            raise UnserializableMessage(message, self.serializer.__name__) from e
 
     def deserialize(self, message: bytes) -> Any:
         """
@@ -132,14 +142,11 @@ class Queue:
         Returns:
             The deserialized message
         """
-        if self.deserializer:
-            try:
-                return self.deserializer(message)
-            except Exception as e:
-                # TODO: This might be a place to provide a hook or configuration for error handling
-                raise UndeserializableMessage(message, self.deserializer.__name__) from e
-        else:
-            return message
+        try:
+            return self.deserializer(message)
+        except Exception as e:  # NOQA: BLE001
+            # TODO: This might be a place to provide a hook or configuration for error handling
+            raise UndeserializableMessage(message, self.deserializer.__name__) from e
 
     def push(self, message: Any, delay: Optional[int] = None, ttl: Optional[int] = None) -> str:
         """
@@ -156,7 +163,7 @@ class Queue:
             The message id
         """
         serialized = self.serialize(message)
-        return self.connection.push_message(self.name, serialized, delay=delay, ttl=ttl)
+        return queue_ops.push_message(self.connection, self.name, serialized, delay=delay, ttl=ttl)
 
     def push_many(self, messages: List[Any], delay: Optional[int] = None, ttl: Optional[int] = None) -> list:
         """
@@ -172,12 +179,12 @@ class Queue:
         Returns:
             All message ids
         """
-        message_ids = []
-        with self.connection.pipeline():
-            for message in messages:
-                serialized = self.serialize(message)
-                message_ids.append(self.connection.push_message(self.name, serialized, delay=delay, ttl=ttl))
-        return message_ids
+        tx = self.connection.pipeline(transaction=True)
+        for message in messages:
+            serialized = self.serialize(message)
+            queue_ops.push_message(tx, self.name, serialized, delay=delay, ttl=ttl)
+        message_ids = tx.execute()
+        return [msg_id.decode("utf-8") for msg_id in message_ids]
 
     def delete(self, msg_id: str) -> None:
         """
@@ -186,7 +193,7 @@ class Queue:
         Args:
             msg_id: The ID of the message to delete
         """
-        self.connection.delete_message(self.name, msg_id)
+        queue_ops.delete_message(self.connection, self.name, msg_id)
 
     def get(self, visibility_timeout: Optional[int] = None, raise_on_empty: bool = False) -> Optional[ReceivedMessage]:
         """
@@ -204,7 +211,7 @@ class Queue:
         Returns:
             The message if available, or ``None``
         """
-        msg = self.connection.get_message(self.name, visibility_timeout=visibility_timeout)
+        msg = queue_ops.get_message(self.connection, self.name, visibility_timeout=visibility_timeout)
         if msg is None and raise_on_empty:
             raise NoMessageInQueue(self.name)
         elif msg is None:
@@ -219,9 +226,6 @@ class Queue:
 
         Args:
             raise_on_empty: optional (Default: False) Raise an exception if there is no message.
-
-        Raises:
-            NoMessageInQueue: If the queue was empty and ``raise_on_empty`` is ``True``
 
         Returns:
             The message if available, or ``None``
