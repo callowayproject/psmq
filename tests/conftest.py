@@ -1,9 +1,9 @@
 from pathlib import Path
 
 import pytest
+from redis.client import Redis
 
 from psmq.connection import get_redis_from_path
-from redis.client import Redis
 
 
 @pytest.fixture

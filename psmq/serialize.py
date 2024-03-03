@@ -1,7 +1,7 @@
 """Serialize and deserialize messages."""
 
-from typing import Callable, Any
 import json
+from typing import Any, Callable
 
 SerializerFunc = Callable[[Any], bytes]
 DeserializerFunc = Callable[[bytes], Any]
@@ -15,5 +15,6 @@ def default_serializer(message: Any) -> bytes:
 def default_deserializer(message: bytes) -> Any:
     """Deserialize a message using JSON."""
     if isinstance(message, bytes):
-        message = message.decode("utf-8")
-    return json.loads(message)
+        return json.loads(message.decode("utf-8"))
+    else:
+        return json.loads(message)

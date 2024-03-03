@@ -4,11 +4,11 @@ from pathlib import Path
 
 from redis import Redis
 
-
 PSMQ_LIBRARY_FILE = Path(__file__).parent.joinpath("psmq_library.lua")
 
 
 def setup_redis_connection(connection: Redis) -> Redis:
+    """Load the PSMQ Lua library into the Redis connection."""
     psmq_library = PSMQ_LIBRARY_FILE.read_text()
     connection.function_load(psmq_library)  # type: ignore[attr-defined]
     return connection

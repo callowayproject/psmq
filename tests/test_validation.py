@@ -1,8 +1,9 @@
 """Tests of the validation module."""
 
 import pytest
-from psmq.validation import validate_queue_name, validate_int
-from psmq.exceptions import InvalidQueueName, QueueNameTooLong, InvalidCharacter, ValueTooLow, ValueTooHigh
+
+from psmq.exceptions import InvalidCharacter, InvalidQueueName, QueueNameTooLong, ValueTooHigh, ValueTooLow
+from psmq.validation import validate_int, validate_queue_name
 
 
 class TestValidateQueueName:

@@ -1,7 +1,5 @@
 """Queue Operations for Redis connections."""
 
-from collections.abc import Generator
-from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional, Union
 

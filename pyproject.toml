@@ -167,6 +167,7 @@ ignore = [
     "ANN002", "ANN003", "ANN101", "ANN102", "ANN204", "ANN401",
     "S101", "S104",
     "D106", "D107", "D200", "D212",
+    "N818",
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.

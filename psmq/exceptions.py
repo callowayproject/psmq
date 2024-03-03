@@ -1,5 +1,6 @@
 """Exceptions raised."""
-from typing import Any
+
+from typing import Any, Union
 
 
 class PSMQError(Exception):
@@ -76,7 +77,7 @@ class ValueTooLow(ValueError):
     Raised when a numerical value is lower than a specified minumum.
     """
 
-    def __init__(self, min_val):
+    def __init__(self, min_val: Union[int, float]):
         super().__init__(f"The value must not be lower than {min_val}.")
 
 
@@ -85,7 +86,7 @@ class ValueTooHigh(ValueError):
     Raised when a numerical value is greater than a specified maximum.
     """
 
-    def __init__(self, max_val):
+    def __init__(self, max_val: Union[int, float]):
         super().__init__(f"The value must not be higher than {max_val}.")
 
 

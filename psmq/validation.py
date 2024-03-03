@@ -1,13 +1,14 @@
 """Validation functions."""
+
 import re
-from typing import Optional
+from typing import Any, Optional
 
 from .exceptions import (
     InvalidCharacter,
+    InvalidQueueName,
     QueueNameTooLong,
     ValueTooHigh,
     ValueTooLow,
-    InvalidQueueName,
 )
 
 #: :obj:`re.Pattern`: A compiled regular expression that detects all invalid characters
@@ -56,7 +57,7 @@ def validate_queue_name(qname: str, raise_on_error: bool = False) -> bool:
 
 
 def validate_int(
-    value,
+    value: Any,
     min_value: Optional[int] = None,
     max_value: Optional[int] = None,
     raise_on_error: bool = False,
@@ -100,7 +101,7 @@ def validate_int(
 
 
 def validate_float(
-    value,
+    value: Any,
     min_value: Optional[float] = None,
     max_value: Optional[float] = None,
     quiet: bool = False,

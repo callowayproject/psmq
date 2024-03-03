@@ -1,14 +1,14 @@
 """Queues and message handling."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import Any, List, Optional
 
 from redis import Redis
 
 from psmq import queue_ops
 from psmq.exceptions import NoMessageInQueue, UndeserializableMessage, UnserializableMessage
-from psmq.serialize import DeserializerFunc, SerializerFunc, default_serializer, default_deserializer
 from psmq.message import ReceivedMessage
+from psmq.serialize import DeserializerFunc, SerializerFunc, default_deserializer, default_serializer
 from psmq.validation import validate_queue_name
 
 

@@ -1,14 +1,13 @@
 """Test the low-level queue functions in lua."""
 
 import datetime
+
 import pytest
 import redis
 import umsgpack
-
 from redis.client import Redis
 
 from psmq.utils import list_to_dict
-from tests.conftest import conn
 
 
 def test_b36_encode(conn: Redis):
@@ -196,7 +195,7 @@ def test_get_message(conn: Redis):
 
 def test_get_message_no_message_on_queue(conn: Redis):
     """You can get a blank message from an existing queue when there is not message on the queue."""
-    r = conn.fcall("create_queue", 3, "test_queue", "", 10)
+    conn.fcall("create_queue", 3, "test_queue", "", 10)
 
     # Get and verify the message
     msg = list_to_dict(conn.fcall("get_message", 1, "test_queue"))

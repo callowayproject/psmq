@@ -3,9 +3,10 @@
 import datetime
 
 import pytest
-from redis.client import Redis
-from psmq import queue_ops
 from msgpack import unpackb
+from redis.client import Redis
+
+from psmq import queue_ops
 
 
 def test_list_queues_returns_a_set_of_queue_names(conn: Redis):
@@ -126,7 +127,7 @@ class TestPushMessage:
 
     def test_can_send_to_a_nonexisting_queue(self, conn: Redis):
         """You can send a message to a non-existing queue."""
-        ts_msec = int((datetime.datetime.now().timestamp()) * 1_000)
+        int((datetime.datetime.now().timestamp()) * 1_000)
         msg_id = queue_ops.push_message(conn, "test_queue", "foo".encode("utf-8"), 0)
         msg = conn.hget("test_queue:Q", msg_id).decode("utf8")
         assert msg == "foo"
@@ -199,14 +200,14 @@ class TestGetMessage:
     def test_can_override_vt(self, conn: Redis):
         """You can get a message from an existing queue and overrides the vt."""
         viz_timeout = 10
-        msg_id = queue_ops.push_message(conn, "test_queue", "foo".encode("utf-8"))
+        queue_ops.push_message(conn, "test_queue", "foo".encode("utf-8"))
 
         # Get the sorted messages before the get_message call
         pre_messages = conn.zrange("test_queue", 0, -1, withscores=True)
         assert len(pre_messages) == 1
 
         # Get and verify the message
-        msg = queue_ops.get_message(conn, "test_queue", visibility_timeout=viz_timeout)
+        queue_ops.get_message(conn, "test_queue", visibility_timeout=viz_timeout)
 
         # Get the sorted messages after the get_message call
         post_messages = conn.zrange("test_queue", 0, -1, withscores=True)

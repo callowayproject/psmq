@@ -1,12 +1,12 @@
 """Tests of the Queue class."""
 
 import pytest
-
 from redis.client import Redis
+
 from psmq import queue_ops
-from psmq.exceptions import UnserializableMessage, UndeserializableMessage, NoMessageInQueue
-from psmq.serialize import default_serializer, default_deserializer
+from psmq.exceptions import NoMessageInQueue, UndeserializableMessage, UnserializableMessage
 from psmq.queue import Queue, QueueConfiguration, QueueMetadata
+from psmq.serialize import default_deserializer, default_serializer
 
 
 class TestCreation:
