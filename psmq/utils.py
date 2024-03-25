@@ -1,4 +1,5 @@
 """Utility functions for the psmq package."""
+
 from itertools import islice
 from typing import Any, Iterable, Tuple
 
